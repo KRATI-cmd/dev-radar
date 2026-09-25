@@ -129,15 +129,14 @@ async function loadDigests() {
     return;
   }
   digests.forEach((d) => {
-    const filename = (d.filePath || "").split(/[\\/]/).pop();
-    const htmlName = filename ? filename.replace(/\.md$/, ".html") : "";
+    const id = encodeURIComponent(d.id);
     const row = document.createElement("div");
     row.className = "digest-row";
     row.innerHTML = `
       <span>📋 <b>${d.type}</b> digest &mdash; ${new Date(d.generatedAt).toLocaleString()}</span>
       <span>
-        ${htmlName ? `<a href="/digests/${htmlName}" target="_blank">View HTML</a>` : ""}
-        ${filename ? `<a href="/digests/${filename}" target="_blank">View Markdown</a>` : ""}
+        <a href="/api/digests/${id}/html" target="_blank">View HTML</a>
+        <a href="/api/digests/${id}/markdown" target="_blank">View Markdown</a>
       </span>
     `;
     digestsList.appendChild(row);

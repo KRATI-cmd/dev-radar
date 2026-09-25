@@ -1,0 +1,14 @@
+{
+  "rewrites": [
+    { "source": "/api/((?!cron/).*)", "destination": "/api/index" }
+  ],
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 60,
+      "includeFiles": "config/**"
+    }
+  },
+  "crons": [
+    { "path": "/api/cron/daily", "schedule": "0 8 * * *" }
+  ]
+}

@@ -253,6 +253,42 @@ Customize in `src/index.ts` if needed.
 
 ---
 
+## Web Dashboard
+
+```bash
+npm run web   # http://localhost:4173
+```
+
+Browse, search, and filter (category, source, language) collected items with pagination, star/dismiss them, and open generated digests.
+
+---
+
+## Deploy to Vercel
+
+Vercel's filesystem is read-only and its functions don't run continuously, so the deployed version stores data in [Turso](https://turso.tech) (hosted SQLite) and uses a Vercel Cron Job instead of `node-cron`.
+
+1. **Create a Turso database** (free tier is enough):
+   ```bash
+   turso db create dev-radar
+   turso db show dev-radar --url        # -> TURSO_DATABASE_URL
+   turso db tokens create dev-radar     # -> TURSO_AUTH_TOKEN
+   ```
+2. **Add Environment Variables** in your Vercel project settings:
+   - `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` (required)
+   - `CRON_SECRET` - any long random string (required; protects the cron route)
+   - `ANTHROPIC_API_KEY` (optional)
+3. **Deploy.** Vercel serves the dashboard from `public/`, the API from `api/index.ts`, and runs `api/cron/daily.ts` daily at 08:00 UTC (collect, daily digest, and the weekly digest on Sundays).
+
+The first dashboard load will be empty until the cron runs. To populate it right away, trigger the cron once manually:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" https://<your-app>.vercel.app/api/cron/daily
+```
+
+Locally, nothing changes: without `TURSO_DATABASE_URL`, the app uses `data/techradar.db`.
+
+---
+
 ## Why This Helps Your Development
 
 1. **Stay Current**: New technologies emerge constantly. TechRadar keeps you informed.

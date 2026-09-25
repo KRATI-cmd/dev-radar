@@ -1,145 +1,6 @@
 import cron from "node-cron";
-import { fetchGitHubTrending, fetchNPMTrending, fetchHackerNewsTrending } from "./collectors/sources";
-import { analyzeTechItem, generateDigest } from "./ai/analyzer";
-import { saveDigest, generateMarkdownDigest } from "./digest/generator";
-import { filterAndScoreByPreferences } from "./config/preferences";
+import { collectAndAnalyzeTech, generateDailyDigest, generateWeeklyDigest } from "./tasks";
 import { db } from "./storage/database";
-import { DigestItem, Digest } from "./types";
-
-async function collectAndAnalyzeTech(): Promise<void> {
-  console.log("🔍 Collecting trending technologies...");
-
-  try {
-    const [githubItems, npmItems, hnItems] = await Promise.all([
-      fetchGitHubTrending(),
-      fetchNPMTrending(),
-      fetchHackerNewsTrending(),
-    ]);
-
-    console.log(
-      `✅ Found ${githubItems.length} GitHub repos, ${npmItems.length} NPM packages, and ${hnItems.length} Hacker News stories`
-    );
-
-    // Apply config/preferences.json: drop excluded keywords, boost relevance
-    // for your primary stack, interests, preferred languages and category weights
-    const allItems = filterAndScoreByPreferences([...githubItems, ...npmItems, ...hnItems]);
-
-    // Analyze each item
-    console.log("🤖 Analyzing with Claude AI...");
-    for (const item of allItems.slice(0, 15)) {
-      // Limit to top 15 (by preference-adjusted relevance) to save API calls
-      const analysis = await analyzeTechItem(item);
-      item.aiSummary = analysis.summary;
-      item.relevanceScore = analysis.relevanceScore;
-      item.analyzedAt = new Date();
-
-      // Store in database
-      db.insertItem(item);
-      console.log(`  ✓ ${item.title}`);
-    }
-
-    console.log("💾 Stored in database");
-  } catch (error) {
-    console.error("❌ Error during collection:", error);
-  }
-}
-
-async function generateDailyDigest(): Promise<void> {
-  console.log("\n📋 Generating daily digest...");
-
-  const recentItems = db.getRecentItems(24, 20);
-
-  if (recentItems.length === 0) {
-    console.log("⚠️ No items found for today's digest");
-    return;
-  }
-
-  // Get digest analysis from Claude
-  const { trends, insights } = await generateDigest(recentItems, "daily");
-
-  // Create digest items with reasoning
-  const digestItems: DigestItem[] = recentItems.slice(0, 10).map((item) => ({
-    item,
-    reasoning: `Relevant to your ${item.category} interests with ${(item.relevanceScore * 100).toFixed(0)}% relevance score`,
-    actionItems: [
-      `Explore this ${item.category} technology`,
-      `Add to your learning backlog if interested`,
-    ],
-  }));
-
-  const digest: Digest = {
-    id: `digest_${Date.now()}`,
-    type: "daily",
-    generatedAt: new Date(),
-    items: digestItems,
-    trends,
-    insights,
-  };
-
-  // Save digest as both markdown and HTML
-  const filepath = saveDigest(digest, digestItems, "markdown");
-  saveDigest(digest, digestItems, "html");
-
-  // Also save to database
-  db.saveDigest(
-    digest.id,
-    digest.type,
-    recentItems.map((i) => i.id),
-    trends,
-    insights,
-    filepath
-  );
-
-  console.log("✅ Daily digest generated!");
-  console.log(`📊 Digest includes ${digestItems.length} items`);
-}
-
-async function generateWeeklyDigest(): Promise<void> {
-  console.log("\n📋 Generating weekly digest...");
-
-  const weekItems = db.getRecentItems(24 * 7, 50);
-
-  if (weekItems.length === 0) {
-    console.log("⚠️ No items found for this week");
-    return;
-  }
-
-  const { trends, insights } = await generateDigest(weekItems, "weekly");
-
-  const digestItems: DigestItem[] = weekItems.slice(0, 20).map((item) => ({
-    item,
-    reasoning: `Significant development in ${item.category} with strong community interest`,
-    actionItems: [
-      `Research use cases in your projects`,
-      `Share with team if relevant`,
-      `Consider for upcoming architecture`,
-    ],
-  }));
-
-  const digest: Digest = {
-    id: `digest_${Date.now()}`,
-    type: "weekly",
-    generatedAt: new Date(),
-    items: digestItems,
-    trends,
-    insights,
-  };
-
-  const filepath = saveDigest(digest, digestItems, "markdown");
-  saveDigest(digest, digestItems, "html");
-
-  db.saveDigest(
-    digest.id,
-    digest.type,
-    weekItems.map((i) => i.id),
-    trends,
-    insights,
-    filepath
-  );
-
-  console.log("✅ Weekly digest generated!");
-  console.log(`📊 Digest includes ${digestItems.length} items`);
-}
 
 async function handleCommand(command: string, arg?: string): Promise<void> {
   switch (command) {
@@ -156,7 +17,7 @@ async function handleCommand(command: string, arg?: string): Promise<void> {
       break;
 
     case "digest:latest":
-      const latest = db.getLatestDigest();
+      const latest = await db.getLatestDigest();
       if (latest) {
         console.log(`\n📄 Latest digest: ${latest.type} - ${latest.generatedAt}`);
         console.log(`📁 Saved at: ${latest.filePath}`);
@@ -170,7 +31,7 @@ async function handleCommand(command: string, arg?: string): Promise<void> {
         console.log("Please provide a search query");
         break;
       }
-      const results = db.searchItems(arg, 10);
+      const results = await db.searchItems(arg, 10);
       console.log(`\n🔍 Found ${results.length} results for "${arg}":\n`);
       results.forEach((item) => {
         console.log(`- [${item.category}] ${item.title}`);
@@ -181,7 +42,7 @@ async function handleCommand(command: string, arg?: string): Promise<void> {
 
     case "show":
       const category = arg || "backend";
-      const items = db.getItemsByCategory(category, 10);
+      const items = await db.getItemsByCategory(category, 10);
       console.log(`\n📊 Top items in ${category}:\n`);
       items.forEach((item) => {
         console.log(
@@ -196,7 +57,7 @@ async function handleCommand(command: string, arg?: string): Promise<void> {
         console.log("Please provide an item ID");
         break;
       }
-      db.starItem(arg);
+      await db.starItem(arg);
       console.log(`⭐ Starred item ${arg}`);
       break;
 
@@ -205,7 +66,7 @@ async function handleCommand(command: string, arg?: string): Promise<void> {
         console.log("Please provide an item ID");
         break;
       }
-      db.dismissItem(arg);
+      await db.dismissItem(arg);
       console.log(`🗑️ Dismissed item ${arg}`);
       break;
 
@@ -214,12 +75,12 @@ async function handleCommand(command: string, arg?: string): Promise<void> {
         console.log("Please provide an item ID");
         break;
       }
-      db.unstarItem(arg);
+      await db.unstarItem(arg);
       console.log(`☆ Unstarred item ${arg}`);
       break;
 
     case "starred":
-      const starredItems = db.getStarredItems(20).items;
+      const starredItems = (await db.getStarredItems(20)).items;
       console.log(`\n⭐ Starred items (${starredItems.length}):\n`);
       starredItems.forEach((item) => {
         console.log(`- [${item.category}] ${item.title} (${item.id})`);
@@ -228,7 +89,7 @@ async function handleCommand(command: string, arg?: string): Promise<void> {
       break;
 
     case "stats":
-      const stats = db.getStats();
+      const stats = await db.getStats();
       console.log(`\n📊 TechRadar Stats\n`);
       console.log(`Total items collected: ${stats.totalItems}`);
       console.log(`Digests generated: ${stats.digestCount}`);
