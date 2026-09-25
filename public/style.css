@@ -93,6 +93,16 @@ main { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1rem; }
 .actions button.starred { background: #fff8e1; border-color: #f5c518; color: #92700a; }
 .actions button:hover { background: #f5f6f8; }
 .empty { color: #98a2b3; text-align: center; padding: 2rem 0; }
+.error-banner {
+  background: #fef3f2;
+  border: 1px solid #fecdca;
+  color: #b42318;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
 
 .pager {
   display: flex;

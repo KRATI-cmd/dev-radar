@@ -1,18 +1,24 @@
 import { createClient, Client } from "@libsql/client";
+import fs from "fs";
 import path from "path";
 import { TechItem } from "../types";
 
-// Local dev (and `npm run collect`/`digest`/`web` on your machine) uses a local
-// SQLite file via libSQL's embedded mode -- no external service needed.
-// On Vercel, set TURSO_DATABASE_URL + TURSO_AUTH_TOKEN so data survives
-// between serverless invocations (Vercel's filesystem is ephemeral).
-if (process.env.VERCEL && !process.env.TURSO_DATABASE_URL) {
-  throw new Error(
-    "TURSO_DATABASE_URL is not set. Vercel's filesystem is read-only, so add TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in your Vercel project's Environment Variables."
-  );
+// Local dev uses data/techradar.db. On Vercel, TURSO_DATABASE_URL/TOKEN give
+// persistent storage; without them we fall back to /tmp (the only writable
+// path there), which is wiped on cold starts but re-seeded so the app still
+// shows data.
+function resolveDbUrl(): string {
+  if (process.env.TURSO_DATABASE_URL) return process.env.TURSO_DATABASE_URL;
+  if (process.env.VERCEL) {
+    console.warn("⚠️ TURSO_DATABASE_URL not set: using temporary /tmp database (data resets on cold starts)");
+    return "file:/tmp/techradar.db";
+  }
+  const dataDir = path.join(process.cwd(), "data");
+  fs.mkdirSync(dataDir, { recursive: true });
+  return `file:${path.join(dataDir, "techradar.db")}`;
 }
 
-const url = process.env.TURSO_DATABASE_URL || `file:${path.join(process.cwd(), "data", "techradar.db")}`;
+const url = resolveDbUrl();
 const authToken = process.env.TURSO_AUTH_TOKEN;
 
 export class TechRadarDB {
@@ -86,6 +92,46 @@ export class TechRadarDB {
         await this.client.execute(`ALTER TABLE digests ADD COLUMN ${col} TEXT`);
       }
     }
+
+    await this.seedIfEmpty();
+  }
+
+  // Loads seed/items.json into an empty database so a fresh deploy shows data
+  // before the first cron collection has run.
+  private async seedIfEmpty(): Promise<void> {
+    const countRs = await this.client.execute(`SELECT COUNT(*) as c FROM tech_items`);
+    if (Number((countRs.rows[0] as any).c) > 0) return;
+
+    const seedPath = path.join(process.cwd(), "seed", "items.json");
+    if (!fs.existsSync(seedPath)) return;
+
+    const items: TechItem[] = JSON.parse(fs.readFileSync(seedPath, "utf-8"));
+    await this.client.batch(
+      items.map((item) => ({
+        sql: `
+          INSERT OR IGNORE INTO tech_items
+          (id, title, description, url, source, category, tags, relevanceScore,
+           stars, weeklyDownloads, language, aiSummary)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        args: [
+          item.id,
+          item.title,
+          item.description,
+          item.url,
+          item.source,
+          item.category,
+          JSON.stringify(item.tags ?? []),
+          item.relevanceScore,
+          item.stars ?? null,
+          item.weeklyDownloads ?? null,
+          item.language ?? null,
+          item.aiSummary ?? null,
+        ],
+      })),
+      "write"
+    );
+    console.log(`🌱 Seeded database with ${items.length} starter items`);
   }
 
   private async ensureReady(): Promise<void> {

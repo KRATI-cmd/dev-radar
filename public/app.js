@@ -7,6 +7,28 @@ const starredPager = document.getElementById("starred-pager");
 const digestsList = document.getElementById("digests-list");
 const statsEl = document.getElementById("stats");
 
+async function getJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`${url} failed (HTTP ${res.status})${body ? `: ${body.slice(0, 200)}` : ""}`);
+  }
+  return res.json();
+}
+
+function showError(err) {
+  let banner = document.getElementById("error-banner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "error-banner";
+    banner.className = "error-banner";
+    document.querySelector("main").prepend(banner);
+  }
+  banner.textContent = `Couldn't load data from the API. ${err.message || err}`;
+}
+
+window.addEventListener("unhandledrejection", (e) => showError(e.reason));
+
 function renderPager(container, { page, totalPages, total }, onPageChange) {
   container.innerHTML = "";
   if (total === 0) return;
@@ -74,8 +96,7 @@ async function loadFeed() {
   if (state.includeDismissed) params.set("includeDismissed", "true");
   params.set("page", state.feedPage);
 
-  const res = await fetch(`/api/items?${params}`);
-  const data = await res.json();
+  const data = await getJSON(`/api/items?${params}`);
 
   if (data.items.length === 0 && data.page > 1) {
     state.feedPage = data.page - 1;
@@ -99,8 +120,7 @@ async function loadStarred() {
   const params = new URLSearchParams();
   params.set("page", state.starredPage);
 
-  const res = await fetch(`/api/starred?${params}`);
-  const data = await res.json();
+  const data = await getJSON(`/api/starred?${params}`);
 
   if (data.items.length === 0 && data.page > 1) {
     state.starredPage = data.page - 1;
@@ -121,8 +141,7 @@ async function loadStarred() {
 }
 
 async function loadDigests() {
-  const res = await fetch("/api/digests");
-  const digests = await res.json();
+  const digests = await getJSON("/api/digests");
   digestsList.innerHTML = "";
   if (digests.length === 0) {
     digestsList.innerHTML = `<div class="empty">No digests generated yet. Run "npm run digest:daily".</div>`;
@@ -166,8 +185,7 @@ function refreshActiveTab() {
 }
 
 async function loadStats() {
-  const res = await fetch("/api/stats");
-  const s = await res.json();
+  const s = await getJSON("/api/stats");
   statsEl.innerHTML = `
     <span><b>${s.totalItems}</b> items</span>
     <span><b>${s.starredCount}</b> starred</span>
@@ -176,8 +194,7 @@ async function loadStats() {
 }
 
 async function loadLanguages() {
-  const res = await fetch("/api/languages");
-  const languages = await res.json();
+  const languages = await getJSON("/api/languages");
   const select = document.getElementById("language");
   languages.forEach((lang) => {
     const opt = document.createElement("option");
