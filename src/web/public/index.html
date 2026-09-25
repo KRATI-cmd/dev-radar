@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TechRadar Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🚀 TechRadar</h1>
+    <div id="stats" class="stats"></div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="feed">Feed</button>
+    <button class="tab" data-tab="starred">Starred</button>
+    <button class="tab" data-tab="digests">Digests</button>
+  </nav>
+
+  <main>
+    <section id="feed-tab" class="tab-panel active">
+      <div class="filters">
+        <input id="search" type="search" placeholder="Search title, description, tags..." />
+        <select id="category">
+          <option value="">All categories</option>
+          <option value="backend">Backend</option>
+          <option value="frontend">Frontend</option>
+          <option value="devops">DevOps</option>
+          <option value="ai-ml">AI/ML</option>
+          <option value="full-stack">Full-stack</option>
+        </select>
+        <select id="source">
+          <option value="">All sources</option>
+          <option value="github">GitHub</option>
+          <option value="npm">NPM</option>
+          <option value="hackernews">Hacker News</option>
+        </select>
+        <select id="language">
+          <option value="">All languages</option>
+        </select>
+        <label class="checkbox">
+          <input id="includeDismissed" type="checkbox" />
+          Show dismissed
+        </label>
+      </div>
+      <div id="feed-list" class="item-list"></div>
+      <div id="feed-pager" class="pager"></div>
+    </section>
+
+    <section id="starred-tab" class="tab-panel">
+      <div id="starred-list" class="item-list"></div>
+      <div id="starred-pager" class="pager"></div>
+    </section>
+
+    <section id="digests-tab" class="tab-panel">
+      <div id="digests-list" class="digest-list"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

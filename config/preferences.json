@@ -1,0 +1,23 @@
+{
+  "primaryStack": ["Node.js", "TypeScript", "Express.js", "PostgreSQL"],
+  "interests": [
+    "Backend Development",
+    "Microservices",
+    "DevOps",
+    "AI/ML Integration",
+    "Database Optimization",
+    "API Design"
+  ],
+  "experienceLevel": "senior",
+  "excludeKeywords": ["wordpress", "php", "wordpress-plugin", "deprecated"],
+  "preferredLanguages": ["JavaScript", "TypeScript", "Python", "Go", "Rust"],
+  "categoryWeights": {
+    "backend": 0.4,
+    "devops": 0.3,
+    "ai-ml": 0.2,
+    "full-stack": 0.1,
+    "frontend": 0.0
+  },
+  "starrableItems": [],
+  "dismissedItems": []
+}
